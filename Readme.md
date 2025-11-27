@@ -142,6 +142,8 @@ React는 이를 더욱 최적화하기 위해:
 
 하지만 우리는 간단하게 시작할 거예요!
 
+### 4.1 이전DOM과 현재DOM을 비교할수있도록 인터페이스 생성하고 저장
+
 - react-dom.ts에 이전 DOM을 저장할 수 있는 인터페이스 ExtendNode를 Node를 확장하여 만든다
 
 ```tsx
@@ -163,3 +165,251 @@ interface ExtendNode extends Node {
     ...
   }
 ```
+
+### 4.2 이전DOM과 현재DOM을 비교하는 diff알고리즘
+
+reconcile 함수는 4가지 케이스로 나뉜다:
+
+**케이스 1: 새로운 게 없다 → 삭제**
+
+```tsx
+if (!newVDom && oldDom) {
+  parentDom.removeChild(oldDom);
+  return;
+}
+```
+
+**케이스 2: 이전 게 없다 → 추가**
+
+```tsx
+if (!oldVDom) {
+  const newDom = createDOM(newVDom!);
+  parentDom.appendChild(newDom);
+  return;
+}
+```
+
+**케이스 3: 타입이 다르다 → 교체**
+
+```tsx
+if (oldVDom.type !== newVDom!.type) {
+  const newDom = createDOM(newVDom!);
+  parentDom.replaceChild(newDom, oldDom!);
+  return;
+}
+```
+
+**케이스 4: 타입이 같다 → 업데이트**
+
+```tsx
+// 기존 DOM을 재사용! (성능 최적화의 핵심)
+(oldDom as ExtendNode)._vdom = newVDom!;
+
+// 속성 업데이트
+updateProps(oldDom as HTMLElement, oldVDom.props, newVDom!.props);
+
+// 자식들 재귀적으로 reconcile
+reconcileChildren(
+  oldDom as HTMLElement,
+  oldVDom.props.children,
+  newVDom!.props.children
+);
+```
+
+### 4.3 속성(Props) 업데이트
+
+속성이 변경되었을 때 DOM을 재사용하면서 속성만 업데이트한다.
+
+**updateProps 함수 구현:**
+
+```tsx
+function updateProps(dom: HTMLElement | Text, oldProps: any, newProps: any) {
+  // Step 1: 이전 props 중 사라진 것들 제거
+  Object.keys(oldProps)
+    .filter(isProperty)
+    .filter(isGone(oldProps, newProps))
+    .forEach((name) => {
+      (dom as any)[name] = "";
+    });
+
+  // Step 2: 새롭거나 변경된 props 설정
+  Object.keys(newProps)
+    .filter(isProperty)
+    .filter(isNew(oldProps, newProps))
+    .forEach((name) => {
+      (dom as any)[name] = newProps[name];
+    });
+}
+```
+
+**헬퍼 함수들:**
+
+```tsx
+const isProperty = (key: string) => key !== "children";
+const isGone = (prev: any, next: any) => (key: string) => !(key in next);
+const isNew = (prev: any, next: any) => (key: string) =>
+  prev[key] !== next[key];
+```
+
+### 4.4 자식(Children) 재귀적으로 Reconcile
+
+자식들도 동일한 방식으로 비교하고 업데이트한다.
+
+**reconcileChildren 함수 구현:**
+
+```tsx
+function reconcileChildren(
+  dom: HTMLElement,
+  oldChildren: VDOMElement[],
+  newChildren: VDOMElement[]
+) {
+  // 더 긴 배열의 길이만큼 순회 (추가/삭제 처리)
+  const maxLength = Math.max(oldChildren.length, newChildren.length);
+
+  for (let i = 0; i < maxLength; i++) {
+    const newChild = newChildren[i];
+    const oldChildDom = dom.childNodes[i];
+
+    // reconcile 재귀 호출!
+    reconcile(dom, oldChildDom || null, newChild || null);
+  }
+}
+```
+
+### 4.5 파일 구조 분리
+
+코드의 가독성과 유지보수를 위해 파일을 역할별로 분리한다.
+
+```
+src/core/react-dom/
+├── types.ts          - 타입 정의 (ExtendNode)
+├── createDOM.ts      - Virtual DOM → 실제 DOM 생성
+├── updateProps.ts    - 속성 업데이트
+├── reconcile.ts      - Reconciliation 로직
+├── render.ts         - createRoot 공개 API
+└── index.ts          - 통합 export
+```
+
+### 4.6 createRoot에서 reconcile 사용
+
+마지막으로 render.ts의 createRoot에서 reconcile을 호출하도록 변경한다.
+
+```tsx
+export function createRoot(container: HTMLElement) {
+  return {
+    render(element: VDOMElement) {
+      // 기존 DOM 가져오기
+      const oldDom = container.firstChild;
+
+      // reconcile 호출
+      // - 첫 렌더링: oldDom이 null이므로 새로 생성
+      // - 이후 렌더링: 변경된 부분만 업데이트
+      reconcile(container, oldDom, element);
+    },
+  };
+}
+```
+
+**핵심 포인트:**
+
+- 처음 렌더링: `oldDom`이 null → 케이스 2 (추가)
+- 두 번째 이후: 변경된 부분만 업데이트 → 성능 최적화!
+
+### 4.7 Reconciliation 완성 🎉
+
+이제 React의 핵심 기능인 효율적인 DOM 업데이트가 완성되었다!
+
+---
+
+## 🔄 Reconciliation 동작 방식
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  1단계: 첫 렌더링                                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  root.render(<App />)                                         │
+│         ↓                                                     │
+│  Virtual DOM 생성                                             │
+│         ↓                                                     │
+│  reconcile 호출 (oldDom = null)                              │
+│         ↓                                                     │
+│  케이스 2: 추가 → createDOM으로 전체 DOM 생성                 │
+│         ↓                                                     │
+│  실제 DOM에 추가 + _vdom 속성에 Virtual DOM 저장 ⭐          │
+│                                                               │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│  2단계: 상태 변경 후 재렌더링                                 │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  상태 변경 (예: count++)                                      │
+│         ↓                                                     │
+│  root.render(<App />)  // 다시 호출!                         │
+│         ↓                                                     │
+│  새로운 Virtual DOM 생성                                      │
+│         ↓                                                     │
+│  reconcile 호출 (oldDom = 기존 DOM)                          │
+│         ↓                                                     │
+│  oldDom._vdom 에서 이전 Virtual DOM 꺼내기 ⭐                │
+│         ↓                                                     │
+│  ┌─────────────────────────────────────┐                     │
+│  │  비교 (Diffing Algorithm)           │                     │
+│  ├─────────────────────────────────────┤                     │
+│  │  이전 VDOM  vs  새로운 VDOM         │                     │
+│  │                                      │                     │
+│  │  <div id="app">     <div id="app">  │                     │
+│  │    Count: 0    →      Count: 1      │                     │
+│  │  </div>             </div>           │                     │
+│  └─────────────────────────────────────┘                     │
+│         ↓                                                     │
+│  케이스 4: 타입 같음 (div = div)                             │
+│         ↓                                                     │
+│  기존 DOM 재사용! 🎯                                         │
+│         ↓                                                     │
+│  ├─ updateProps (속성만 변경)                                │
+│  └─ reconcileChildren (자식들 재귀 비교)                     │
+│              ↓                                                │
+│         텍스트 노드만 "Count: 0" → "Count: 1" 업데이트       │
+│                                                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📊 성능 비교
+
+**기존 방식 (Reconciliation 없이):**
+
+```tsx
+매번 render 호출 시:
+  1. 전체 DOM 삭제
+  2. 전체 DOM 새로 생성
+  3. 전체 DOM 추가
+
+→ 느리고 비효율적! ❌
+→ input focus, 스크롤 위치 등 상태 초기화 ❌
+```
+
+**Reconciliation 적용:**
+
+```tsx
+매번 render 호출 시:
+  1. 이전 Virtual DOM과 비교
+  2. 변경된 부분만 찾기
+  3. 변경된 부분만 실제 DOM 업데이트
+
+→ 빠르고 효율적! ✅
+→ DOM 상태 유지 ✅
+→ React의 핵심 성능 최적화! ✅
+```
+
+---
+
+## ✨ 최적화 효과
+
+- ✅ **불필요한 DOM 조작 감소** - 변경된 부분만 업데이트
+- ✅ **성능 향상** - DOM 조작은 느린 연산, 최소화가 핵심
+- ✅ **상태 유지** - input focus, 스크롤 위치, CSS 애니메이션 유지
+- ✅ **배터리 절약** - 모바일에서 특히 중요!
