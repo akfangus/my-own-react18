@@ -7,4 +7,3 @@ import { VDOMElement } from "../react";
 export interface ExtendNode extends Node {
   _vdom?: VDOMElement;
 }
-
