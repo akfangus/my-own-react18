@@ -109,3 +109,57 @@ function createElement(
 
 - type이 문자열이면? 👉 기존처럼 DOM 생성 (document.createElement)
 - type이 함수면? 👉 그 함수를 실행해서 나온 결과물을 가지고 다시 render!
+
+```tsx
+function render(element: VDOMElement, container: HTMLElement) {
+  // [NEW] 0. 함수형 컴포넌트 처리
+  // type이 함수라면, 그 함수를 실행해서 나온 결과물(children)을 가지고
+  // 다시 render를 호출한다. (재귀)
+  if (typeof element.type === "function") {
+    const component = element.type as any;
+    const childElement = component(element.props);
+    render(childElement, container);
+    return; // 여기서 끝! 아래 로직(DOM 생성)은 실행하지 않음
+  }
+  // 1. 요소 생성 (기존 코드)
+  const dom = ...
+  // ... (나머지는 그대로)
+}
+```
+
+## Chapter 4. 재조정 (Reconciliation)
+
+- React의 Virtual DOM은 변경시에 전체를 다시 그리지않고 변경된 부분만 찾아서 업데이트를 실행한다.
+
+- Reconciliation의 핵심은 즉 처음 Virtual DOM을 생성하여 기억한뒤에 두번째 render 시에 처음 DOM과 비교하여 변경된 부분만 다시 그리는 형식
+
+📝 React의 실제 접근법
+React는 이를 더욱 최적화하기 위해:
+
+1. 같은 레벨끼리만 비교 (트리의 모든 조합을 비교하지 않음)
+2. key prop 사용 (리스트 아이템 식별)
+3. 컴포넌트 타입으로 판단 (타입이 다르면 하위 트리 전체 교체)
+
+하지만 우리는 간단하게 시작할 거예요!
+
+- react-dom.ts에 이전 DOM을 저장할 수 있는 인터페이스 ExtendNode를 Node를 확장하여 만든다
+
+```tsx
+interface ExtendNode extends Node {
+  _vdom?: VDOMElement;
+}
+```
+
+- render함수에 그리기전 이전 VDOM을 저장한다
+
+```tsx
+(dom as ExtendNode)._vdom - element;
+```
+
+- 이전 DOM과 현재 DOM을 비교하는 함수 reconcile을 구현
+
+```tsx
+  function reconcile(parentDOM, oldDom, newVDom) {
+    ...
+  }
+```

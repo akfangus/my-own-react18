@@ -1,3 +1,12 @@
+// VDOM의 형태 예시
+// {
+//   type: "div",
+//   props: {
+//     children: [
+//       { type: "h1", props: { children: "Hello, world!" } },
+//     ],
+//   },
+// }
 export interface VDOMElement {
   type: string;
   props: {
