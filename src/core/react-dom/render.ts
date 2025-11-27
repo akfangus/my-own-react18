@@ -1,4 +1,4 @@
-import { VDOMElement } from "../react";
+import { VDOMElement } from "@/react/types";
 import { reconcile } from "./reconcile";
 
 /**

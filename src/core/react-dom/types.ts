@@ -1,4 +1,4 @@
-import { VDOMElement } from "../react";
+import { VDOMElement } from "@/react/types";
 
 /**
  * DOM 노드에 Virtual DOM 정보를 저장하기 위한 타입 확장

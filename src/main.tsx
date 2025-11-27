@@ -1,6 +1,7 @@
 //테스트 코드 작성하기
-import { React } from "./core/react";
-import { ReactDOM } from "./core/react-dom";
+
+import { ReactDOM } from "@/core/react-dom";
+import { React } from "@/react";
 
 //1. 우리가 만든 React 를 사용해서 화면에 Hello World를 렌더링 해보자
 // const element = (

@@ -413,3 +413,165 @@ export function createRoot(container: HTMLElement) {
 - ✅ **성능 향상** - DOM 조작은 느린 연산, 최소화가 핵심
 - ✅ **상태 유지** - input focus, 스크롤 위치, CSS 애니메이션 유지
 - ✅ **배터리 절약** - 모바일에서 특히 중요!
+
+---
+
+## Chapter 5. Hooks 🪝
+
+Hooks는 함수형 컴포넌트에서 **상태(state)**와 **생명주기(lifecycle)**를 사용할 수 있게 해주는 기능이다.
+
+### 5.1 Hook의 핵심 문제
+
+```tsx
+function Counter() {
+  const [count, setCount] = useState(0);
+  // 🤔 count는 어디에 저장될까?
+  // 🤔 함수가 끝나면 사라지는데 어떻게 유지될까?
+}
+```
+
+**해결책**: Hook 상태를 **컴포넌트 밖(전역)**에 저장!
+
+### 5.2 Hook 저장 전략
+
+```
+┌─────────────────────────────────────────┐
+│  전역에 Hook 상태 저장                    │
+├─────────────────────────────────────────┤
+│                                           │
+│  hooks = []        // 모든 hook 저장     │
+│  hookIndex = 0     // 현재 hook 위치     │
+│                                           │
+│  [첫 렌더링]                              │
+│  useState(0)  → hooks[0] = { state: 0 } │
+│  useState('') → hooks[1] = { state: '' }│
+│                                           │
+│  [재렌더링]                               │
+│  useState(0)  → hooks[0]에서 가져오기    │
+│  useState('') → hooks[1]에서 가져오기    │
+│                                           │
+└─────────────────────────────────────────┘
+```
+
+### 5.3 useState 동작 흐름
+
+```
+1. 첫 렌더링
+   useState(0) 호출
+   ↓
+   hooks[0] = { state: 0 } 저장
+   ↓
+   [0, setState] 반환
+
+2. setState(1) 호출
+   ↓
+   hooks[0].state = 1 업데이트
+   ↓
+   hookIndex = 0 초기화
+   ↓
+   컴포넌트 재렌더링 (reconcile 실행)
+
+3. 재렌더링
+   useState(0) 호출 (초기값 무시)
+   ↓
+   hooks[0]에서 { state: 1 } 가져오기
+   ↓
+   [1, setState] 반환
+```
+
+### 5.4 파일 구조
+
+```
+src/react/
+├── types.ts
+├── react.ts          - createElement
+├── hooks/
+│   └── useState.ts   - useState 구현
+└── index.ts          - 통합 export
+```
+
+### 5.5 핵심 구현
+
+**전역 변수:**
+
+```tsx
+let hooks: any[] = []; // Hook 저장소
+let currentHookIndex = 0; // 현재 위치
+let currentRoot: any = null; // 재렌더링용
+```
+
+**useState 구현:**
+
+```tsx
+export function useState<T>(initialValue: T): [T, (newValue: T) => void] {
+  const hookIndex = currentHookIndex;
+
+  // 첫 렌더링: hook 생성
+  if (hooks[hookIndex] === undefined) {
+    hooks[hookIndex] = { state: initialValue };
+  }
+
+  // setState 함수
+  const setState = (newValue: T) => {
+    hooks[hookIndex].state = newValue;
+    resetHookIndex(); // 인덱스 초기화
+    currentRoot.render(currentRoot.element); // 재렌더링
+  };
+
+  currentHookIndex++; // 다음 hook을 위해 증가
+  return [hooks[hookIndex].state, setState];
+}
+```
+
+**render.ts 수정:**
+
+```tsx
+export function createRoot(container: HTMLElement) {
+  const root = {
+    element: null,
+    render(element: VDOMElement) {
+      resetHookIndex(); // 렌더링 시작 전 초기화 ⭐
+      root.element = element;
+
+      const oldDom = container.firstChild;
+      reconcile(container, oldDom, element);
+    },
+  };
+
+  setRerender(root, container); // 재렌더링 설정 ⭐
+  return root;
+}
+```
+
+### 5.6 Hooks의 규칙
+
+**왜 Hook은 최상위에서만 호출해야 할까?**
+
+```tsx
+// ❌ 조건문 안에서 Hook 호출 (금지!)
+function BadComponent() {
+  if (condition) {
+    const [state, setState] = useState(0); // hookIndex 꼬임!
+  }
+}
+
+// ✅ 항상 최상위에서 호출
+function GoodComponent() {
+  const [state, setState] = useState(0); // 항상 hooks[0]
+  if (condition) {
+    // state 사용
+  }
+}
+```
+
+**이유**: Hook은 배열 인덱스로 관리되므로 **호출 순서가 일정**해야 함!
+
+```
+첫 렌더링:    재렌더링:
+hooks[0] ✅   hooks[0] ✅  (같은 위치)
+hooks[1] ✅   hooks[1] ✅
+```
+
+---
+
+📚 **자세한 내용**: [useState 구현 가이드](./docs/hooks/useState.md)

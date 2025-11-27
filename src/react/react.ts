@@ -7,13 +7,7 @@
 //     ],
 //   },
 // }
-export interface VDOMElement {
-  type: string;
-  props: {
-    children: VDOMElement[];
-    [key: string]: any; // 다른 props 들도 들어올 수 있음 (id, className 등)
-  };
-}
+import { VDOMElement } from "./types";
 
 // children에 텍스트가 들어갔을때 TEXT_ELEMENT로 변환
 function createTextElement(text: string): VDOMElement {
@@ -26,7 +20,7 @@ function createTextElement(text: string): VDOMElement {
   };
 }
 
-function createElement(
+export function createElement(
   type: string,
   props: any,
   ...children: any[]
@@ -43,7 +37,3 @@ function createElement(
     },
   };
 }
-
-export const React = {
-  createElement,
-};

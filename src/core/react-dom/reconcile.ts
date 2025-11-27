@@ -1,4 +1,4 @@
-import { VDOMElement } from "../react";
+import { VDOMElement } from "@/react/types";
 import { ExtendNode } from "./types";
 import { createDOM } from "./createDOM";
 import { updateProps } from "./updateProps";

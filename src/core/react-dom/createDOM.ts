@@ -1,9 +1,9 @@
-import { VDOMElement } from "../react";
+import { VDOMElement } from "@/react/types";
 import { ExtendNode } from "./types";
 
 /**
  * Virtual DOM을 실제 DOM으로 생성
- * 
+ *
  * @param vdom - Virtual DOM 요소
  * @returns 생성된 실제 DOM 노드
  */
@@ -48,4 +48,3 @@ export function createDOM(vdom: VDOMElement): Node {
   // Step 5: 완성된 DOM 반환
   return dom;
 }
-
