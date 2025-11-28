@@ -29,13 +29,27 @@ import { resetHookIndex, setRerender } from "@/react/hooks/store";
  * @returns render 메서드를 가진 루트 객체
  */
 export function createRoot(container: HTMLElement) {
-  return {
-    render(element: VDOMElement) {
-      // 현재: 기존 render 호출
+  // element를 저장할 변수
+  let currentElement: VDOMElement | null = null;
 
-      // [TODO - 다음 단계] reconcile로 변경 예정:
+  const root: any = {
+    element: currentElement, // root 객체에도 저장
+    render(element: VDOMElement) {
+      // 1. 렌더링 시작 전 hookIndex 초기화 ⭐
+      resetHookIndex();
+
+      // 2. element 저장 (setState에서 사용) ⭐
+      currentElement = element;
+      root.element = element;
+
+      // 3. reconcile 호출
       const oldDom = container.firstChild;
       reconcile(container, oldDom, element);
     },
   };
+
+  // 4. useState에게 root 정보 전달 ⭐
+  setRerender(root, container);
+
+  return root;
 }
