@@ -1,5 +1,12 @@
 import { VDOMElement } from "@/react/types";
 import { reconcile } from "./reconcile";
+// render를 훅과 연결
+/**
+ * 훅과 연결
+ * resetHookIndex : 인덱스 초기화, 렌더링 시작 -> hookIndex초기화, useState들이 순서대로 hook[0], hook[1] 순으로 저장되도록 함.
+ * setRerender : 재렌더링 설정, createRoot 생성시 -> 정보를 useState에 전달., setState 호출시 -> 재렌더링 트리거
+ */
+import { resetHookIndex, setRerender } from "@/react/hooks/store";
 
 /**
  * Virtual DOM을 실제 DOM으로 렌더링
